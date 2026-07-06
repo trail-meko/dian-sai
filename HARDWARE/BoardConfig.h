@@ -92,7 +92,7 @@ extern const DacFreqGear_t g_DacFreqGear[FREQ_GEAR_COUNT];
 #define ADC_SCAN_RAW_LEN      (FFT_SIZE * 2U)
 
 #define ADC_SAMPLE_PSC        0U
-#define ADC_SAMPLE_ARR        1638U
+#define ADC_SAMPLE_ARR        4199U   /* 84MHz/4200=20KHz，低于ADC上限(21KHz)，确保无触发丢失 */
 #define ADC_SAMPLE_RATE_HZ    ((float)TIM2_CLK_HZ / (float)(ADC_SAMPLE_ARR + 1U))
 #define ADC_INTERCH_DELAY_SEC (492.0f / 21000000.0f)
 
@@ -102,16 +102,16 @@ extern const DacFreqGear_t g_DacFreqGear[FREQ_GEAR_COUNT];
 /* -------------------------------------------------------------------------- */
 /* C.4 FFT analysis                                                           */
 /* -------------------------------------------------------------------------- */
-#define FFT_AVG_COUNT         4U
+#define FFT_AVG_COUNT         10U  /* 10帧×200ms=2s滑动窗口，提高频率/RMS/增益稳定性 */
 #define FFT_BIN_SEARCH_RADIUS 3U
 #define FFT_BIN_TARGET_TOLERANCE 4U
 #define FFT_BIN_MIN_MAG       40.0f
 #define FFT_AUTO_GAIN_PEAK    28000.0f
 #define UI_RMS_LOSS_V         0.003f
 /* Ui ADC RMS 校准：显示 101.2mV，实测 98.74mV，目标 100.0mV（配合 DAC 系数） */
-#define UI_RMS_CAL_SCALE       1.0f
+#define UI_RMS_CAL_SCALE       3.1535f
 /* Uo ADC RMS 校准：初校 1.496V/0.309V，二次微调 1.502V/1.494V */
-#define UO_RMS_CAL_SCALE      1.0f
+#define UO_RMS_CAL_SCALE      18.0f
 
 /* -------------------------------------------------------------------------- */
 /* C.5 PID（分段调节，100 ms 周期）                                            */
