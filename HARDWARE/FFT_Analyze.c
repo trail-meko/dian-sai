@@ -146,6 +146,17 @@ static float FFT_GetBinMagnitude(const float *fft_buf, uint16_t bin)
     return sqrtf(re * re + im * im) / (float)FFT_SIZE * FFT_MAG_SCALE;
 }
 
+static float FFT_BinToVrms(const float *fft_buf, uint16_t bin)
+{
+    float mag = FFT_GetBinMagnitude(fft_buf, bin);
+    /* mag = |X[k]| / N * FFT_MAG_SCALE
+       |X[k]| = A * N / 2  (A = sine amplitude in ADC codes)
+       A = 2 * mag / FFT_MAG_SCALE
+       Vrms = (A / sqrt(2)) * Vref / 4095
+            = mag * 1.4142 * Vref / (FFT_MAG_SCALE * 4095) */
+    return mag * 1.41421356f * ADC_VREF / (FFT_MAG_SCALE * (float)ADC_MAX_CODE);
+}
+
 static void FFT_GetBinComplex(const float *fft_buf, uint16_t bin, float *re, float *im)
 {
     *re = fft_buf[2U * bin];
@@ -425,6 +436,17 @@ uint8_t FFT_Analyze_Process(uint16_t *raw_ui,
             *fail_code = 3U;
         }
         return 1U;
+    }
+
+    /* Extract 1st/3rd/5th harmonic RMS from Ui FFT spectrum */
+    {
+        uint16_t h3_bin = (uint16_t)(peak_bin * 3U);
+        uint16_t h5_bin = (uint16_t)(peak_bin * 5U);
+        uint16_t nyquist = (uint16_t)(FFT_SIZE / 2U);
+
+        out->h1_v = FFT_BinToVrms(s_FftBufUi, peak_bin);
+        out->h3_v = (h3_bin < nyquist) ? FFT_BinToVrms(s_FftBufUi, h3_bin) : 0.0f;
+        out->h5_v = (h5_bin < nyquist) ? FFT_BinToVrms(s_FftBufUi, h5_bin) : 0.0f;
     }
 
     FFT_PackAcAutoGain(raw_uo, uo_mean, s_FftBufUo);

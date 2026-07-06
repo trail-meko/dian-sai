@@ -25,6 +25,9 @@ typedef struct
     float    av_gain;
     float    phase_deg;
     float    meas_freq_hz;
+    float    h1_v;           /* 1st harmonic RMS voltage (input fundamental) */
+    float    h3_v;           /* 3rd harmonic RMS voltage (input) */
+    float    h5_v;           /* 5th harmonic RMS voltage (input) */
     float    target_out_v;
     uint8_t  freq_ok;
     uint8_t  fault_flags;

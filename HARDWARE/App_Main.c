@@ -30,6 +30,9 @@ static void App_CopyFftToMeasure(const FFTMeasure_t *fft, MeasureResult_t *dst)
     dst->av_gain = fft->av_gain;
     dst->phase_deg = fft->phase_deg;
     dst->meas_freq_hz = fft->meas_freq_hz;
+    dst->h1_v = fft->h1_v;
+    dst->h3_v = fft->h3_v;
+    dst->h5_v = fft->h5_v;
     dst->freq_ok = fft->freq_ok;
     dst->adc_ui_min = fft->adc_ui_min;
     dst->adc_ui_max = fft->adc_ui_max;

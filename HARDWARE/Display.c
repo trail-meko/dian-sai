@@ -171,12 +171,155 @@ static void Display_FormatLine8(char *buf, const MeasureResult_t *m)
     }
 }
 
+static void Display_FormatHarmonic(char *buf, float h1, float h3, float h5, float phase_deg)
+{
+    uint8_t i = 0U;
+
+    buf[i++] = 'H';
+    buf[i++] = ':';
+
+    /* h1 — 基波 RMS */
+    {
+        int32_t h1_mv = (int32_t)(h1 * 1000.0f + 0.5f);
+
+        if (h1_mv >= 1000)
+        {
+            /* >= 1V，显示 V.x.xxx */
+            buf[i++] = (char)('0' + (h1_mv / 1000U) % 10U);
+            buf[i++] = '.';
+            buf[i++] = (char)('0' + (h1_mv / 100U) % 10U);
+            buf[i++] = (char)('0' + (h1_mv / 10U) % 10U);
+            buf[i++] = (char)('0' + h1_mv % 10U);
+        }
+        else
+        {
+            /* 显示整数 mV */
+            buf[i++] = (char)('0' + (h1_mv / 100U) % 10U);
+            buf[i++] = (char)('0' + (h1_mv / 10U) % 10U);
+            buf[i++] = (char)('0' + h1_mv % 10U);
+        }
+    }
+
+    /* h3 — 3次谐波 RMS (mV) */
+    {
+        int32_t h3_mv = (int32_t)(h3 * 1000.0f + 0.5f);
+
+        buf[i++] = '/';
+        if (h3_mv >= 100)
+        {
+            buf[i++] = (char)('0' + (h3_mv / 100U) % 10U);
+            buf[i++] = (char)('0' + (h3_mv / 10U) % 10U);
+            buf[i++] = '.';
+            buf[i++] = (char)('0' + h3_mv % 10U);
+        }
+        else if (h3_mv >= 10)
+        {
+            buf[i++] = (char)('0' + (h3_mv / 10U) % 10U);
+            buf[i++] = '.';
+            buf[i++] = (char)('0' + h3_mv % 10U);
+        }
+        else
+        {
+            buf[i++] = (char)('0' + h3_mv % 10U);
+            buf[i++] = '.';
+            buf[i++] = '0';
+        }
+    }
+
+    /* h5 — 5次谐波 RMS (mV) */
+    {
+        int32_t h5_mv = (int32_t)(h5 * 1000.0f + 0.5f);
+
+        buf[i++] = '/';
+        if (h5_mv >= 100)
+        {
+            buf[i++] = (char)('0' + (h5_mv / 100U) % 10U);
+            buf[i++] = (char)('0' + (h5_mv / 10U) % 10U);
+            buf[i++] = '.';
+            buf[i++] = (char)('0' + h5_mv % 10U);
+        }
+        else if (h5_mv >= 10)
+        {
+            buf[i++] = (char)('0' + (h5_mv / 10U) % 10U);
+            buf[i++] = '.';
+            buf[i++] = (char)('0' + h5_mv % 10U);
+        }
+        else
+        {
+            buf[i++] = (char)('0' + h5_mv % 10U);
+            buf[i++] = '.';
+            buf[i++] = '0';
+        }
+    }
+
+    /* 相位 (四舍五入到整数度) */
+    {
+        int32_t deci = (int32_t)(phase_deg * 10.0f + ((phase_deg >= 0.0f) ? 0.5f : -0.5f));
+        uint32_t abs_deci;
+
+        buf[i++] = ' ';
+
+        if (deci < 0)
+        {
+            abs_deci = (uint32_t)(-deci);
+            buf[i++] = '-';
+        }
+        else
+        {
+            abs_deci = (uint32_t)deci;
+        }
+
+        {
+            uint32_t whole = (abs_deci + 5U) / 10U;  /* deci → 四舍五入到整数度 */
+
+            if (whole >= 100U)
+            {
+                buf[i++] = (char)('0' + (whole / 100U) % 10U);
+            }
+            buf[i++] = (char)('0' + (whole / 10U) % 10U);
+            buf[i++] = (char)('0' + whole % 10U);
+        }
+        buf[i++] = 'd';
+    }
+
+    buf[i] = '\0';
+}
+
+static void Display_FormatFreqLine(char *buf, float meas_freq_hz, uint8_t freq_ok)
+{
+    uint16_t hz = (uint16_t)(meas_freq_hz + 0.5f);
+    uint8_t i = 0U;
+
+    buf[i++] = 'f';
+    buf[i++] = ':';
+    if (hz >= 10000U)
+    {
+        buf[i++] = (char)('0' + (hz / 10000U) % 10U);
+    }
+    buf[i++] = (char)('0' + (hz / 1000U) % 10U);
+    buf[i++] = (char)('0' + (hz / 100U) % 10U);
+    buf[i++] = (char)('0' + (hz / 10U) % 10U);
+    buf[i++] = (char)('0' + hz % 10U);
+    buf[i++] = 'H';
+    buf[i++] = 'z';
+    buf[i++] = ' ';
+    if (freq_ok != 0U)
+    {
+        buf[i++] = 'O';
+        buf[i++] = 'K';
+    }
+    else
+    {
+        buf[i++] = 'E';
+        buf[i++] = 'R';
+        buf[i++] = 'R';
+    }
+    buf[i] = '\0';
+}
+
 static void Display_Refresh(void)
 {
-    char line[20];
-    char freq_buf[8];
-    const char *mode_str;
-    const char *wave_str;
+    char line[24];
     uint8_t y;
     MeasureResult_t snap;
     uint32_t primask;
@@ -193,89 +336,86 @@ static void Display_Refresh(void)
     snap = g_MeasureResult;
     __set_PRIMASK(primask);
 
-    mode_str = (g_AppParams.mode == WORK_MODE_AUTO) ? "A:AUTO" : "M:MAN ";
-    wave_str = (g_AppParams.wave == WAVE_TRIANGLE) ? "TRI" : "SIN";
-
-    Display_FormatFreqKhz(freq_buf, g_AppParams.target_freq_hz);
-
     OLED_Clear();
     y = 0U;
 
-    line[0] = '\0';
-    (void)strcat(line, mode_str);
-    (void)strcat(line, " ");
-    (void)strcat(line, wave_str);
-    (void)strcat(line, " ");
-    (void)strcat(line, freq_buf);
-    OLED_ShowString(0, y, line, OLED_6X8);
-    y = (uint8_t)(y + DISPLAY_LINE_H);
-
-    if (g_AppParams.mode == WORK_MODE_AUTO)
+    /* Line 1: I = input RMS voltage */
     {
-        (void)strcpy(line, "Tar:1.50V");
+        line[0] = 'I';
+        line[1] = ':';
+        if (snap.ui_rms_v >= 1.0f)
+        {
+            uint32_t mv = (uint32_t)(snap.ui_rms_v * 1000.0f + 0.5f);
+
+            line[2] = (char)('0' + (mv / 1000U) % 10U);
+            line[3] = '.';
+            line[4] = (char)('0' + (mv / 100U) % 10U);
+            line[5] = (char)('0' + (mv / 10U) % 10U);
+            line[6] = (char)('0' + mv % 10U);
+            line[7] = 'V';
+            line[8] = '\0';
+        }
+        else
+        {
+            uint32_t tenths_mv = (uint32_t)(snap.ui_rms_v * 10000.0f + 0.5f);
+            uint32_t whole = tenths_mv / 10U;
+            uint32_t frac = tenths_mv % 10U;
+
+            line[2] = (char)('0' + (whole / 100U) % 10U);
+            line[3] = (char)('0' + (whole / 10U) % 10U);
+            line[4] = (char)('0' + whole % 10U);
+            line[5] = '.';
+            line[6] = (char)('0' + frac);
+            line[7] = 'm';
+            line[8] = 'V';
+            line[9] = '\0';
+        }
+        OLED_ShowString(0, y, line, OLED_6X8);
+        y = (uint8_t)(y + DISPLAY_LINE_H);
+    }
+
+    /* Line 2: V = output RMS voltage */
+    {
+        uint32_t mv = (uint32_t)(snap.uo_rms_v * 1000.0f + 0.5f);
+
+        line[0] = 'V';
+        line[1] = ':';
+        line[2] = (char)('0' + (mv / 1000U) % 10U);
+        line[3] = '.';
+        line[4] = (char)('0' + (mv / 100U) % 10U);
+        line[5] = (char)('0' + (mv / 10U) % 10U);
+        line[6] = (char)('0' + mv % 10U);
+        line[7] = 'V';
+        line[8] = '\0';
+        OLED_ShowString(0, y, line, OLED_6X8);
+        y = (uint8_t)(y + DISPLAY_LINE_H);
+    }
+
+    /* Line 3: harmonics + phase */
+    if (snap.fault_flags != 0U)
+    {
+        line[0] = 'F'; line[1] = 'L'; line[2] = 'T'; line[3] = ':';
+        line[4] = (char)(((snap.fault_flags >> 4) & 0x0FU) <= 9U ?
+                         ('0' + ((snap.fault_flags >> 4) & 0x0FU)) :
+                         ('A' + ((snap.fault_flags >> 4) & 0x0FU) - 10U));
+        line[5] = (char)((snap.fault_flags & 0x0FU) <= 9U ?
+                         ('0' + (snap.fault_flags & 0x0FU)) :
+                         ('A' + (snap.fault_flags & 0x0FU) - 10U));
+        line[6] = '\0';
+    }
+    else if (snap.fft_fail_code != 0U && snap.meas_freq_hz < 1.0f)
+    {
+        (void)strcpy(line, "SIG LOSS");
     }
     else
     {
-        (void)strcpy(line, "Tar:100mV");
+        Display_FormatHarmonic(line, snap.h1_v, snap.h3_v, snap.h5_v, snap.phase_deg);
     }
     OLED_ShowString(0, y, line, OLED_6X8);
     y = (uint8_t)(y + DISPLAY_LINE_H);
 
-    Display_FormatUi(line, snap.ui_rms_v);
-    OLED_ShowString(0, y, line, OLED_6X8);
-    y = (uint8_t)(y + DISPLAY_LINE_H);
-
-    Display_FormatVolts3(line, "Uo:", snap.uo_rms_v);
-    OLED_ShowString(0, y, line, OLED_6X8);
-    y = (uint8_t)(y + DISPLAY_LINE_H);
-
-    Display_FormatAv(line, snap.av_gain);
-    OLED_ShowString(0, y, line, OLED_6X8);
-    y = (uint8_t)(y + DISPLAY_LINE_H);
-
-    Display_FormatPhase(line, snap.phase_deg);
-    OLED_ShowString(0, y, line, OLED_6X8);
-    y = (uint8_t)(y + DISPLAY_LINE_H);
-
-    if (snap.freq_ok != 0U)
-    {
-        uint16_t hz = (uint16_t)snap.meas_freq_hz;
-
-        line[0] = 'f';
-        line[1] = ':';
-        line[2] = (char)('0' + (hz / 1000U) % 10U);
-        line[3] = (char)('0' + (hz / 100U) % 10U);
-        line[4] = (char)('0' + (hz / 10U) % 10U);
-        line[5] = (char)('0' + hz % 10U);
-        line[6] = 'H';
-        line[7] = 'z';
-        line[8] = ' ';
-        line[9] = 'O';
-        line[10] = 'K';
-        line[11] = '\0';
-    }
-    else
-    {
-        uint16_t hz = (uint16_t)snap.meas_freq_hz;
-
-        line[0] = 'f';
-        line[1] = ':';
-        line[2] = (char)('0' + (hz / 1000U) % 10U);
-        line[3] = (char)('0' + (hz / 100U) % 10U);
-        line[4] = (char)('0' + (hz / 10U) % 10U);
-        line[5] = (char)('0' + hz % 10U);
-        line[6] = 'H';
-        line[7] = 'z';
-        line[8] = ' ';
-        line[9] = 'E';
-        line[10] = 'R';
-        line[11] = 'R';
-        line[12] = '\0';
-    }
-    OLED_ShowString(0, y, line, OLED_6X8);
-    y = (uint8_t)(y + DISPLAY_LINE_H);
-
-    Display_FormatLine8(line, &snap);
+    /* Line 4: frequency */
+    Display_FormatFreqLine(line, snap.meas_freq_hz, snap.freq_ok);
     OLED_ShowString(0, y, line, OLED_6X8);
 
     OLED_Update();
